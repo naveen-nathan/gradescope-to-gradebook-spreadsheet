@@ -13,6 +13,8 @@ COURSE_ID = 782967
 ASSIGNMENT_ID = 4486584 
 # This scope allows for write access.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SPREADSHEET_ID = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+SAMPLE_RANGE_NAME = "Class Data!A2:E"
 
 def allow_user_to_authenticate_google_account():
   """
@@ -38,11 +40,29 @@ def allow_user_to_authenticate_google_account():
     # Save the credentials for the next run
     with open("token.json", "w") as token:
       token.write(creds.to_json())
+  return creds
+
+def readFromSheet(creds):
+  try:
+    service = build("sheets", "v4", credentials=creds)
+    
+    # Call the Sheets API
+    sheet = service.spreadsheets()
+
+    sheet = service.spreadsheets()
+    sheets = sheet.get(spreadsheetId=SPREADSHEET_ID, fields='sheets/properties/title').execute()
+    sub_sheet_titles = [sheet['properties']['title'] for sheet in sheets['sheets']]
+
+    print(sub_sheet_titles)
+
+  except HttpError as err:
+    print(err)
 
 def main():
-    gradescope_client =  client.GradescopeClient()
-    gradescope_client.prompt_login()
-    assignment_scores = gradescope_client.download_scores(COURSE_ID, ASSIGNMENT_ID)
-    allow_user_to_authenticate_google_account()
+    #gradescope_client =  client.GradescopeClient()
+    #gradescope_client.prompt_login()
+    #assignment_scores = gradescope_client.download_scores(COURSE_ID, ASSIGNMENT_ID)
+    creds = allow_user_to_authenticate_google_account()
+    readFromSheet(creds)
 
 main()
