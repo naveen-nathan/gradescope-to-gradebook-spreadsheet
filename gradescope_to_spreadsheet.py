@@ -10,10 +10,10 @@ from googleapiclient.errors import HttpError
 # CS10 Su24 course id
 COURSE_ID = 782967 
 # CS10 Su24 lab2 assignment id
-ASSIGNMENT_ID = 4486584 
+ASSIGNMENT_ID = "4486584" 
 # This scope allows for write access.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+SPREADSHEET_ID = "1yrHEpO5dOMutG6mfDRwauxqT6F0nirqFAEdqMn8kRhU"
 SAMPLE_RANGE_NAME = "Class Data!A2:E"
 
 def allow_user_to_authenticate_google_account():
@@ -54,6 +54,30 @@ def readFromSheet(creds):
     sub_sheet_titles = [sheet['properties']['title'] for sheet in sheets['sheets']]
 
     print(sub_sheet_titles)
+
+    if ASSIGNMENT_ID not in sub_sheet_titles:
+      #create new sub_sheet
+      pass
+      try:
+         sheetservice = build('sheets', 'v4', credentials=creds)
+        
+         body = {
+            "requests":{
+                "addSheet":{
+                    "properties":{
+                        "title": ASSIGNMENT_ID
+                    }
+                }
+            }
+         }
+
+         sheetservice.spreadsheets().batchUpdate(spreadsheetId=SPREADSHEET_ID, body=body).execute()
+        
+      except HttpError as err:
+        print(err)     
+    else:
+      #update existing sheet
+      pass
 
   except HttpError as err:
     print(err)
