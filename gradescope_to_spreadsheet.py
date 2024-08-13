@@ -66,7 +66,6 @@ def writeToSheet(creds, assignment_scores):
                 }
             }
             response = sheet_api_instance.batchUpdate(spreadsheetId=SPREADSHEET_ID, body=create_sheet_request).execute()
-            print(response)
             sheet_id = response['replies'][0]['addSheet']['properties']['sheetId']
         else:
             sheet_id = sub_sheet_titles_to_ids[str(ASSIGNMENT_ID)]
