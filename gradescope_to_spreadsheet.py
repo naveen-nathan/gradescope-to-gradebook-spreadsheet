@@ -10,8 +10,8 @@ from googleapiclient.errors import HttpError
 
 # CS10 Su24 course id
 COURSE_ID = 782967
-# CS10 Su24 lab2 assignment id
-ASSIGNMENT_ID = sys.argv[1]#"4486584"
+# User provided ASSIGNMENT_ID
+ASSIGNMENT_ID = sys.argv[1]
 # This scope allows for write access.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1yrHEpO5dOMutG6mfDRwauxqT6F0nirqFAEdqMn8kRhU"
@@ -66,7 +66,8 @@ def writeToSheet(creds, assignment_scores):
                 }
             }
             response = sheet_api_instance.batchUpdate(spreadsheetId=SPREADSHEET_ID, body=create_sheet_request).execute()
-            sheet_id = response['replies'][0]['addSheet']['sheetId']
+            print(response)
+            sheet_id = response['replies'][0]['addSheet']['properties']['sheetId']
         else:
             sheet_id = sub_sheet_titles_to_ids[str(ASSIGNMENT_ID)]
 
