@@ -15,98 +15,80 @@ ASSIGNMENT_ID = "4486584"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1yrHEpO5dOMutG6mfDRwauxqT6F0nirqFAEdqMn8kRhU"
 
+"""
+Allows the user authenticate their google account, allowing the script to modify spreadsheets in their name.
+Borrowed from here: https://developers.google.com/sheets/api/quickstart/python
+"""
 def allow_user_to_authenticate_google_account():
-  """
-  Allows the user authenticate their google account, allowing the script to modify spreadsheets in their name.
-  Borrowed from here: https://developers.google.com/sheets/api/quickstart/python  
-  """
-  creds = None
-  # The file token.json stores the user's access and refresh tokens, and is
-  # created automatically when the authorization flow completes for the first
-  # time.
-  if os.path.exists("token.json"):
-    creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-  # If there are no (valid) credentials available, let the user log in.
-  if not creds or not creds.valid:
-    if creds and creds.expired and creds.refresh_token:
-      creds.refresh(Request())
-    else:
-      flow = InstalledAppFlow.from_client_secrets_file(
-          "credentials.json", SCOPES
-      )
-      creds = flow.run_local_server(port=0)
-      print("Authentication succesful")
+    creds = None
+    # The file token.json stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists("token.json"):
+        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+    # If there are no (valid) credentials available, let the user log in.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+              "credentials.json", SCOPES
+           )
+            creds = flow.run_local_server(port=0)
+            print("Authentication succesful")
     # Save the credentials for the next run
     with open("token.json", "w") as token:
       token.write(creds.to_json())
-  return creds
+    return creds
 
 def writeToSheet(creds, assignment_scores):
-  try:
-    service = build("sheets", "v4", credentials=creds)
+    try:
+        service = build("sheets", "v4", credentials=creds)
     
-    # Call the Sheets API
-    sheet = service.spreadsheets()
+        # Call the Sheets API
+        sheet = service.spreadsheets()
+        sheets = sheet.get(spreadsheetId=SPREADSHEET_ID, fields='sheets/properties/title').execute()
+        sub_sheet_titles = [sheet['properties']['title'] for sheet in sheets['sheets']]
 
-    sheet = service.spreadsheets()
-    sheets = sheet.get(spreadsheetId=SPREADSHEET_ID, fields='sheets/properties/title').execute()
-    sub_sheet_titles = [sheet['properties']['title'] for sheet in sheets['sheets']]
-    # Need to keep track of subsheet ids as well
-
-    print(sub_sheet_titles)
-
-    if ASSIGNMENT_ID not in sub_sheet_titles:
-      #create new sub_sheet
-      try:
-         sheetservice = build('sheets', 'v4', credentials=creds)
-        
-         body = {
-            "requests":{
-                "addSheet":{
-                    "properties":{
-                        "title": ASSIGNMENT_ID
+        if ASSIGNMENT_ID not in sub_sheet_titles:
+            create_sheet_request = {
+                "requests":{
+                    "addSheet":{
+                        "properties":{
+                            "title": ASSIGNMENT_ID
+                        }
                     }
                 }
-            }
-         }
-         sheetservice.spreadsheets().batchUpdate(spreadsheetId=SPREADSHEET_ID, body=body).execute()
-         #f = open("assignment_scores.csv", "r")
-         #file_contents = f.read()
-         assignment_scores = assignment_scores.replace("\\n", "\n")
-         body = {
-            'requests': [
-                {
-                'pasteData': {
-                    "coordinate": {
-                        "sheetId": "0",
-                        "rowIndex": "0",  
-                        "columnIndex": "0",
-                    },
-                    "data": str(assignment_scores),
-                    "type": 'PASTE_NORMAL',
-                    "delimiter": ',',
+             }
+            sheet.batchUpdate(spreadsheetId=SPREADSHEET_ID, body=create_sheet_request).execute()
+        push_grade_data_request = {
+                'requests': [
+                    {
+                    'pasteData': {
+                        "coordinate": {
+                            "sheetId": "0",
+                            "rowIndex": "0",
+                            "columnIndex": "0",
+                        },
+                        "data": str(assignment_scores),
+                        "type": 'PASTE_NORMAL',
+                        "delimiter": ',',
+                    }
                 }
-            }
-            ]
+                ]
         }
-         sheetservice.spreadsheets().batchUpdate(spreadsheetId=SPREADSHEET_ID, body=body).execute()
-    
+        sheets.batchUpdate(spreadsheetId=SPREADSHEET_ID, body=push_grade_data_request).execute()
+    except HttpError as err:
+        print(err)
 
-
-        
-      except HttpError as err:
-        print(err)     
-    else:
-      #update existing sheet
-      pass
-
-  except HttpError as err:
-    print(err)
+def retrieve_grades_from_gradescope():
+    gradescope_client = client.GradescopeClient()
+    gradescope_client.prompt_login()
+    assignment_scores = str(gradescope_client.download_scores(COURSE_ID, ASSIGNMENT_ID)).replace("\\n", "\n")
+    return assignment_scores
 
 def main():
-    gradescope_client =  client.GradescopeClient()
-    gradescope_client.prompt_login()
-    assignment_scores = str(gradescope_client.download_scores(COURSE_ID, ASSIGNMENT_ID))
+    assignment_scores = retrieve_grades_from_gradescope()
     creds = allow_user_to_authenticate_google_account()
     writeToSheet(creds, assignment_scores)
 
