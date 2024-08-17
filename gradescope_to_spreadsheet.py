@@ -110,12 +110,11 @@ def initialize_gs_client():
     return gradescope_client
 
 
-def download_scores(gs_instance, class_id: str) -> bytes:
+def get_assignment_info(gs_instance, class_id: str) -> bytes:
     if not gs_instance.logged_in:
         print("You must be logged in to download grades!")
         return False
-    gs_instance.last_res = res = gs_instance.session.get(
-        f"https://www.gradescope.com/courses/{class_id}/assignments")
+    gs_instance.last_res = res = gs_instance.session.get(f"https://www.gradescope.com/courses/{class_id}/assignments")
     if not res or not res.ok:
         print(f"Failed to get a response from gradescope! Got: {res}")
         return False
@@ -132,7 +131,7 @@ This method returns a dictionary mapping assignment IDs to the names (titles) of
 """
 def get_assignment_id_to_names():
     # The response cannot be parsed as a json as is.
-    course_info_response = str(download_scores(initialize_gs_client(), COURSE_ID)).replace("\\\\", "\\")
+    course_info_response = str(get_assignment_info(initialize_gs_client(), COURSE_ID)).replace("\\\\", "\\")
     pattern = '{"id":[0-9]+,"title":"[\w,:\+\s()]+?"}'
     info_for_all_assignments = re.findall(pattern, course_info_response)
     assignment_to_names = { json.loads(assignment)['id'] : json.loads(assignment)['title'] for assignment in info_for_all_assignments }
