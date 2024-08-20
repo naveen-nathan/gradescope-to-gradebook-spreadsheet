@@ -181,6 +181,12 @@ def populate_instructor_dashboard():
         spreadsheet_query = f"=DIVIDE(XLOOKUP(A:A, {assignment_id}!A:A, {assignment_id}!E:E), XLOOKUP(A:A, {assignment_id}!A:A, {assignment_id}!F:F))"
         dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
+    for assignment_name in sorted_projects:
+        assignment_id = assignment_names_to_ids[assignment_name]
+        make_score_sheet_for_one_assignment(creds,gradescope_client = gradescope_client, assignment_id= assignment_id)
+        spreadsheet_query = f"=DIVIDE(XLOOKUP(A:A, {assignment_id}!A:A, {assignment_id}!E:E), XLOOKUP(A:A, {assignment_id}!A:A, {assignment_id}!F:F))"
+        dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+
     dashboard_df = pd.DataFrame(dashboard_dict).set_index(sorted_labs[0])
     output = io.StringIO()
     dashboard_df.to_csv(output)
