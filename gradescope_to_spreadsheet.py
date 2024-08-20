@@ -51,7 +51,7 @@ def allow_user_to_authenticate_google_account():
     return creds
 
 
-def writeToSheet(creds, assignment_scores):
+def writeToSheet(creds, assignment_scores, assignment_id = ASSIGNMENT_ID):
     try:
 
         sheet_api_instance = create_sheet_api_instance(creds)
@@ -60,12 +60,12 @@ def writeToSheet(creds, assignment_scores):
 
         sheet_id = None
 
-        if ASSIGNMENT_ID not in sub_sheet_titles_to_ids:
+        if assignment_id not in sub_sheet_titles_to_ids:
             create_sheet_request = {
                 "requests": {
                     "addSheet": {
                         "properties": {
-                            "title": ASSIGNMENT_ID
+                            "title": assignment_id
                         }
                     }
                 }
@@ -73,7 +73,7 @@ def writeToSheet(creds, assignment_scores):
             response = sheet_api_instance.batchUpdate(spreadsheetId=SPREADSHEET_ID, body=create_sheet_request).execute()
             sheet_id = response['replies'][0]['addSheet']['properties']['sheetId']
         else:
-            sheet_id = sub_sheet_titles_to_ids[ASSIGNMENT_ID]
+            sheet_id = sub_sheet_titles_to_ids[assignment_id]
 
         update_sheet_with_csv(assignment_scores, sheet_api_instance, sheet_id)
         print("Successfully updated spreadsheet with new score data")
@@ -114,9 +114,9 @@ def update_sheet_with_csv(assignment_scores, sheet_api_instance, sheet_id, rowIn
     sheet_api_instance.batchUpdate(spreadsheetId=SPREADSHEET_ID, body=push_grade_data_request).execute()
 
 
-def retrieve_grades_from_gradescope():
-    gradescope_client = initialize_gs_client()
-    assignment_scores = str(gradescope_client.download_scores(COURSE_ID, ASSIGNMENT_ID)).replace("\\n", "\n")
+def retrieve_grades_from_gradescope(gradescope_client, assignment_id = ASSIGNMENT_ID):
+    #gradescope_client = initialize_gs_client()
+    assignment_scores = str(gradescope_client.download_scores(COURSE_ID, assignment_id)).replace("\\n", "\n")
     return assignment_scores
 
 
@@ -137,16 +137,16 @@ def get_assignment_info(gs_instance, class_id: str) -> bytes:
     return res.content
 
 
-def make_score_sheet_for_one_assignment(creds):
-    assignment_scores = retrieve_grades_from_gradescope()
-    writeToSheet(creds, assignment_scores)
+def make_score_sheet_for_one_assignment(creds, gradescope_client, assignment_id = ASSIGNMENT_ID):
+    assignment_scores = retrieve_grades_from_gradescope(gradescope_client = gradescope_client, assignment_id = assignment_id)
+    writeToSheet(creds, assignment_scores, assignment_id)
 
 """
 This method returns a dictionary mapping assignment IDs to the names (titles) of the assignments
 """
-def get_assignment_id_to_names():
+def get_assignment_id_to_names(gradescope_client):
     # The response cannot be parsed as a json as is.
-    course_info_response = str(get_assignment_info(initialize_gs_client(), COURSE_ID)).replace("\\\\", "\\")
+    course_info_response = str(get_assignment_info(gradescope_client, COURSE_ID)).replace("\\\\", "\\")
     pattern = '{"id":[0-9]+,"title":"[\w,:\+\s()]+?"}'
     info_for_all_assignments = re.findall(pattern, course_info_response)
     assignment_to_names = { str(json.loads(assignment)['id']) : json.loads(assignment)['title'] for assignment in info_for_all_assignments }
@@ -154,32 +154,38 @@ def get_assignment_id_to_names():
 
 def main():
     creds = allow_user_to_authenticate_google_account()
-    make_score_sheet_for_one_assignment(creds)
+    gradescope_client = initialize_gs_client()
+    make_score_sheet_for_one_assignment(creds, gradescope_client = gradescope_client)
 
 def populate_instructor_dashboard():
-    assignment_id_to_names = get_assignment_id_to_names()
-    sorted_keys = sorted(assignment_id_to_names.keys())  # sort based on labs and discussions separately
+    creds = allow_user_to_authenticate_google_account()
+    gradescope_client = initialize_gs_client()
+    assignment_id_to_names = get_assignment_id_to_names(gradescope_client)
     labs = filter(lambda assignment: "lab" in assignment.lower(),
                   assignment_id_to_names.values())
     sorted_labs = sorted(labs, key=lambda lab: int(re.findall("\d+", lab)[0]))
-    #lab_ids_to_ids = {lab_name : lab_id for lab_name, lab_id in sorted_labs.items()}
-    creds = allow_user_to_authenticate_google_account()
+
+    assignment_names_to_ids = {v: k for k, v in assignment_id_to_names.items()}
+    projects = set(filter(lambda assignment: "project" in assignment.lower(),
+                  assignment_id_to_names.values()))
+    sorted_projects = sorted(projects, key=lambda project: assignment_names_to_ids[project])
+
     sheet_api_instance = create_sheet_api_instance(creds)
     sub_sheet_titles_to_ids = get_sub_sheet_titles_to_ids(sheet_api_instance)
     dashboard_sheet_id = sub_sheet_titles_to_ids['Instructor_Dashboard']
-    assignment_id = ASSIGNMENT_ID
+    dashboard_dict = {}
 
-    assignment_name = assignment_id_to_names[assignment_id]
-    spreadsheet_query = f"=DIVIDE(XLOOKUP(A:A, {assignment_id}!A:A, {assignment_id}!E:E), XLOOKUP(A:A, {assignment_id}!A:A, {assignment_id}!F:F))"
-    dashboard_column = {assignment_name : [spreadsheet_query] * NUMBER_OF_STUDENTS}
-    dashboard_df = pd.DataFrame(dashboard_column).set_index(assignment_name)
+    for assignment_name in sorted_labs:
+        assignment_id = assignment_names_to_ids[assignment_name]
+        make_score_sheet_for_one_assignment(creds,gradescope_client = gradescope_client, assignment_id= assignment_id)
+        spreadsheet_query = f"=DIVIDE(XLOOKUP(A:A, {assignment_id}!A:A, {assignment_id}!E:E), XLOOKUP(A:A, {assignment_id}!A:A, {assignment_id}!F:F))"
+        dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+
+    dashboard_df = pd.DataFrame(dashboard_dict).set_index(sorted_labs[0])
     output = io.StringIO()
     dashboard_df.to_csv(output)
-    #print(output.getvalue())
-    update_sheet_with_csv(output.getvalue(), sheet_api_instance, dashboard_sheet_id, 0, 5)
+    update_sheet_with_csv(output.getvalue(), sheet_api_instance, dashboard_sheet_id, 0, 3)
     output.close()
 
 
-
 populate_instructor_dashboard()
-
