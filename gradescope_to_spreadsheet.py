@@ -54,10 +54,10 @@ def allow_user_to_authenticate_google_account():
     return creds
 
 
-def writeToSheet(creds, assignment_scores, assignment_id = ASSIGNMENT_ID):
+def writeToSheet(sheet_api_instance, assignment_scores, assignment_id = ASSIGNMENT_ID):
     try:
 
-        sheet_api_instance = create_sheet_api_instance(creds)
+        #sheet_api_instance = create_sheet_api_instance(creds)
 
         sub_sheet_titles_to_ids = get_sub_sheet_titles_to_ids(sheet_api_instance)
 
@@ -77,10 +77,11 @@ def writeToSheet(creds, assignment_scores, assignment_id = ASSIGNMENT_ID):
             sheet_id = response['replies'][0]['addSheet']['properties']['sheetId']
         else:
             sheet_id = sub_sheet_titles_to_ids[assignment_id]
-        if assignment_id not in sub_sheet_titles_to_ids:
-            update_sheet_with_csv(assignment_scores, sheet_api_instance, sheet_id)
-            print("Successfully updated spreadsheet with new score data")
+
+        update_sheet_with_csv(assignment_scores, sheet_api_instance, sheet_id)
+        print("Successfully updated spreadsheet with new score data")
     except HttpError as err:
+        print()
         print(err)
 
 
@@ -140,9 +141,9 @@ def get_assignment_info(gs_instance, class_id: str) -> bytes:
     return res.content
 
 
-def make_score_sheet_for_one_assignment(creds, gradescope_client, assignment_id = ASSIGNMENT_ID):
+def make_score_sheet_for_one_assignment(sheet_api_instance, gradescope_client, assignment_id = ASSIGNMENT_ID):
     assignment_scores = retrieve_grades_from_gradescope(gradescope_client = gradescope_client, assignment_id = assignment_id)
-    writeToSheet(creds, assignment_scores, assignment_id)
+    writeToSheet(sheet_api_instance, assignment_scores, assignment_id)
 
 """
 This method returns a dictionary mapping assignment IDs to the names (titles) of the assignments
@@ -156,7 +157,7 @@ def get_assignment_id_to_names(gradescope_client):
     #  = { json.loads(assignment)['id'] : json.loads(assignment)['title'] for assignment in info_for_all_assignments }
     for assignment in info_for_all_assignments:
         assignment_as_json = json.loads(assignment)
-        assignment_to_names[assignment_as_json["id"]] = assignment_as_json["title"]
+        assignment_to_names[str(assignment_as_json["id"])] = assignment_as_json["title"]
     return assignment_to_names
 
 def main():
@@ -194,7 +195,7 @@ def populate_instructor_dashboard():
     paired_lab_ids = set()
 
     for id in assignment_id_to_names:
-        make_score_sheet_for_one_assignment(creds, gradescope_client=gradescope_client, assignment_id=id)
+        make_score_sheet_for_one_assignment(sheet_api_instance, gradescope_client=gradescope_client, assignment_id=id)
 
     for i in range(len(sorted_labs) - 1):
         first_element = sorted_labs[i]
