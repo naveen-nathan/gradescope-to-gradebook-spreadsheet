@@ -213,6 +213,8 @@ def populate_instructor_dashboard():
         lab_number = extract_number_from_lab_title(assignment_id_to_names[lab_id])
         dashboard_dict["Lab " + str(lab_number)] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
+    dashboard_dict = dict(sorted(dashboard_dict.items(), key=lambda lab: int(re.findall("\d+", lab[0])[0])))
+
     for assignment_name in sorted_projects:
         assignment_id = assignment_names_to_ids[assignment_name]
         #make_score_sheet_for_one_assignment(creds,gradescope_client = gradescope_client, assignment_id= assignment_id)
