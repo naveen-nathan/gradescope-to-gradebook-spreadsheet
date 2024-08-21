@@ -181,34 +181,38 @@ def populate_instructor_dashboard():
     #for first_element, second_element in zip(sorted_labs[0::2], sorted_labs[1::2]):
      #   print(first_element, second_element)
 
-    my_list = [1, 2, 3, 4, 5]
+    all_lab_ids = set()
+    paired_lab_ids = set()
 
     for i in range(len(sorted_labs) - 1):
         first_element = sorted_labs[i]
         second_element = sorted_labs[i + 1]
         first_element_assignment_id = assignment_names_to_ids[first_element]
         second_element_assignment_id = assignment_names_to_ids[second_element]
+        first_element_lab_number = extract_number_from_lab_title(first_element)
+        second_element_lab_number = extract_number_from_lab_title(second_element)
+        all_lab_ids.add(first_element_assignment_id)
+        all_lab_ids.add(second_element_assignment_id)
         #make_score_sheet_for_one_assignment(creds, gradescope_client=gradescope_client, assignment_id=first_element_assignment_id)
         # If this is the last iteration, we need to make the sheet for the second_element, to ensure that it is not excluded.
         if i == len(sorted_labs) - 2:
             pass
-        #    make_score_sheet_for_one_assignment(creds, gradescope_client=gradescope_client, assignment_id=second_element_assignment_id)
-        first_element_lab_number = extract_number_from_lab_title(first_element)
-        if extract_number_from_lab_title(first_element) == extract_number_from_lab_title(second_element):
+            #make_score_sheet_for_one_assignment(creds, gradescope_client=gradescope_client, assignment_id=second_element_assignment_id)
 
-            spreadsheet_query = f"=DIVIDE(XLOOKUP(A:A, '{first_element_assignment_id}'!A:A, '{first_element_assignment_id}'!E:E) + XLOOKUP(A:A, '{second_element_assignment_id}'!A:A, '{second_element_assignment_id}'!E:E), XLOOKUP(A:A, '{first_element_assignment_id}'!A:A, '{first_element_assignment_id}'!F:F) + XLOOKUP(A:A, '{second_element_assignment_id}'!A:A, '{second_element_assignment_id}'!F:F))"
+        if first_element_lab_number == second_element_lab_number:
+            paired_lab_ids.add(first_element_assignment_id)
+            paired_lab_ids.add(second_element_assignment_id)
+            spreadsheet_query = f"=DIVIDE(XLOOKUP(A:A, {first_element_assignment_id}!A:A, {first_element_assignment_id}!E:E) + XLOOKUP(A:A, {second_element_assignment_id}!A:A, {second_element_assignment_id}!E:E), XLOOKUP(A:A, {first_element_assignment_id}!A:A, {first_element_assignment_id}!F:F) + XLOOKUP(A:A, {second_element_assignment_id}!A:A, {second_element_assignment_id}!F:F))"
             dashboard_dict["Lab " + str(first_element_lab_number)] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
-    # Still need to account for labs that don't have 2 separate GS assignments
+    unpaired_lab_ids = all_lab_ids - paired_lab_ids
 
-
-    """
-    for assignment_name in sorted_labs:
-        assignment_id = assignment_names_to_ids[assignment_name]
+    for lab_id in unpaired_lab_ids:
         #make_score_sheet_for_one_assignment(creds,gradescope_client = gradescope_client, assignment_id= assignment_id)
-        spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
-        dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
-    """
+        spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {lab_id}!C:C, {lab_id}!E:E), XLOOKUP(C:C, {lab_id}!C:C, {lab_id}!F:F))"
+        lab_number = extract_number_from_lab_title(assignment_id_to_names[lab_id])
+        dashboard_dict["Lab " + str(lab_number)] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+
     for assignment_name in sorted_projects:
         assignment_id = assignment_names_to_ids[assignment_name]
         #make_score_sheet_for_one_assignment(creds,gradescope_client = gradescope_client, assignment_id= assignment_id)
