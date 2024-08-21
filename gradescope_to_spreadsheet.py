@@ -6,6 +6,7 @@ import sys
 import re
 import pandas as pd
 import io
+import time
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -19,7 +20,7 @@ COURSE_ID = "782967"
 ASSIGNMENT_ID = (len(sys.argv) > 1) and sys.argv[1]
 # This scope allows for write access.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "1kaC1SyYCbQKyZByxu_sX96D-bdGAlMrFWqLXKrivcxU" #"1yrHEpO5dOMutG6mfDRwauxqT6F0nirqFAEdqMn8kRhU"
+SPREADSHEET_ID = "1bpGPdtyaIgMUTFYLgdo_Nr19-0nCC9UD-aa6ZjfNIZI"
 NUMBER_OF_STUDENTS = 77
 # Lab number of labs that are not graded.
 UNGRADED_LABS = [12]
@@ -27,6 +28,8 @@ TOTAL_LAB_POINTS = 100
 
 # Used for labs with 4 parts (very uncommon)
 SPECIAL_CASE_LABS = [16]
+NUM_LECTURES = 20
+NUM_LECTURE_DROPS = 3
 
 """
 Allows the user authenticate their google account, allowing the script to modify spreadsheets in their name.
@@ -77,11 +80,10 @@ def writeToSheet(sheet_api_instance, assignment_scores, assignment_id = ASSIGNME
             sheet_id = response['replies'][0]['addSheet']['properties']['sheetId']
         else:
             sheet_id = sub_sheet_titles_to_ids[assignment_id]
-
         update_sheet_with_csv(assignment_scores, sheet_api_instance, sheet_id)
         print("Successfully updated spreadsheet with new score data")
+        time.sleep(10)
     except HttpError as err:
-        print()
         print(err)
 
 
@@ -180,6 +182,12 @@ def populate_instructor_dashboard():
                   assignment_id_to_names.values()))
     sorted_projects = sorted(projects, key=lambda project: assignment_names_to_ids[project])
 
+    lecture_quizzes = filter(lambda assignment: "lecture" in assignment.lower(),
+                  assignment_id_to_names.values())
+
+    discussions = filter(lambda assignment: "discussion" in assignment.lower(),
+                  assignment_id_to_names.values())
+
     sheet_api_instance = create_sheet_api_instance(creds)
     sub_sheet_titles_to_ids = get_sub_sheet_titles_to_ids(sheet_api_instance)
     dashboard_sheet_id = sub_sheet_titles_to_ids['Instructor_Dashboard']
@@ -229,33 +237,51 @@ def populate_instructor_dashboard():
 
     num_graded_labs = len(dashboard_dict) - len(UNGRADED_LABS)
 
-    lab_score_column = [f"=ARRAYFORMULA(COUNTIF(FILTER(H{i + 2}:{i + 2}, REGEXMATCH(H1:1, \"Lab\")), 1) / {num_graded_labs} * {TOTAL_LAB_POINTS})" for i in range(NUMBER_OF_STUDENTS)]
+    lab_score_column = [f"=ARRAYFORMULA(COUNTIF(FILTER(I{i + 2}:{i + 2}, REGEXMATCH(I1:1, \"Lab\")), 1) / {num_graded_labs} * {TOTAL_LAB_POINTS})" for i in range(NUMBER_OF_STUDENTS)]
     lab_score_title = "Su24CS10 Final Lab Score / 100"
     lab_score_dict = {lab_score_title : lab_score_column}
 
-    number_of_full_credit_labs = [f"=ARRAYFORMULA(COUNTIF(FILTER(H{i + 2}:{i + 2}, REGEXMATCH(H1:1, \"Lab\")), 1))" for i in range(NUMBER_OF_STUDENTS)]
+    number_of_full_credit_labs = [f"=ARRAYFORMULA(COUNTIF(FILTER(I{i + 2}:{i + 2}, REGEXMATCH(I1:1, \"Lab\")), 1))" for i in range(NUMBER_OF_STUDENTS)]
     number_of_full_credit_labs_dict = {"# of full credit labs" : number_of_full_credit_labs}
 
-    lab_average_column = [f"=ARRAYFORMULA(AVERAGE(FILTER(H{i + 2}:AM{i + 2}, REGEXMATCH(H1:1, \"Lab\"))))" for i in range(NUMBER_OF_STUDENTS)]
+    lab_average_column = [f"=ARRAYFORMULA(AVERAGE(FILTER(I{i + 2}:{i + 2}, REGEXMATCH(I1:1, \"Lab\"))))" for i in range(NUMBER_OF_STUDENTS)]
     lab_average_dict = {"Avg. Lab Score" : lab_average_column}
 
-    project_average_column = [f"=ARRAYFORMULA(AVERAGE(FILTER(H{i + 2}:AM{i + 2}, REGEXMATCH(H1:1, \"Project\"))))" for i in range(NUMBER_OF_STUDENTS)]
+    project_average_column = [f"=ARRAYFORMULA(AVERAGE(FILTER(J{i + 2}:{i + 2}, REGEXMATCH(J1:1, \"Project\"))))" for i in range(NUMBER_OF_STUDENTS)]
     project_average_dict = {"Avg. Project Score" : project_average_column}
 
+    lecture_attendance_score = [f"=ARRAYFORMULA((COUNTIF(FILTER(I{i + 2}:{i + 2}, REGEXMATCH(I1:1, \"Lecture\")), 1) + {NUM_LECTURE_DROPS}) / {NUM_LECTURES})" for i in range(NUMBER_OF_STUDENTS)]
+    lecture_quiz_count_dict = {"Su24CS10 Final Lecture Attendance Score (Drops Included)" : lecture_attendance_score}
+
+    discussion_makeup_count = [f"=ARRAYFORMULA(COUNTIF(FILTER(I{i + 2}:{i + 2}, REGEXMATCH(I1:1, \"Discussion\")), 1))" for i in range(NUMBER_OF_STUDENTS)]
+    discussion_makeup_count_dict = {"Su24CS10 Number of Discussion Makeups" : discussion_makeup_count}
 
     for assignment_name in sorted_projects:
         assignment_id = assignment_names_to_ids[assignment_name]
         spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
         dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
+    for assignment_name in lecture_quizzes:
+        assignment_id = assignment_names_to_ids[assignment_name]
+        spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
+        dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+
+    for assignment_name in discussions:
+        assignment_id = assignment_names_to_ids[assignment_name]
+        spreadsheet_query = f"=IF(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!G:G) <> \"Missing\", 1, 0)" #f"XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
+        dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+
+
     dashboard_dict_with_aggregate_columns = {}
     dashboard_dict_with_aggregate_columns.update(lab_score_dict)
+    dashboard_dict_with_aggregate_columns.update(lecture_quiz_count_dict)
+    dashboard_dict_with_aggregate_columns.update(discussion_makeup_count_dict)
     dashboard_dict_with_aggregate_columns.update(number_of_full_credit_labs_dict)
     dashboard_dict_with_aggregate_columns.update(lab_average_dict)
     dashboard_dict_with_aggregate_columns.update(project_average_dict)
     dashboard_dict_with_aggregate_columns.update(dashboard_dict)
 
-    first_column_name = lab_score_title #"Lab " + str(extract_number_from_lab_title(sorted_labs[0]))
+    first_column_name = lab_score_title
     dashboard_df = pd.DataFrame(dashboard_dict_with_aggregate_columns).set_index(first_column_name)
     output = io.StringIO()
     dashboard_df.to_csv(output)
