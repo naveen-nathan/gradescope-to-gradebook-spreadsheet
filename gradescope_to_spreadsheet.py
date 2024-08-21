@@ -22,6 +22,9 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1kaC1SyYCbQKyZByxu_sX96D-bdGAlMrFWqLXKrivcxU" #"1yrHEpO5dOMutG6mfDRwauxqT6F0nirqFAEdqMn8kRhU"
 NUMBER_OF_STUDENTS = 77
 
+# Used for labs with 4 parts (very uncommon)
+SPECIAL_CASE_LABS = [16]
+
 """
 Allows the user authenticate their google account, allowing the script to modify spreadsheets in their name.
 Borrowed from here: https://developers.google.com/sheets/api/quickstart/python
@@ -74,9 +77,9 @@ def writeToSheet(creds, assignment_scores, assignment_id = ASSIGNMENT_ID):
             sheet_id = response['replies'][0]['addSheet']['properties']['sheetId']
         else:
             sheet_id = sub_sheet_titles_to_ids[assignment_id]
-
-        update_sheet_with_csv(assignment_scores, sheet_api_instance, sheet_id)
-        print("Successfully updated spreadsheet with new score data")
+        if assignment_id not in sub_sheet_titles_to_ids:
+            update_sheet_with_csv(assignment_scores, sheet_api_instance, sheet_id)
+            print("Successfully updated spreadsheet with new score data")
     except HttpError as err:
         print(err)
 
@@ -146,16 +149,17 @@ This method returns a dictionary mapping assignment IDs to the names (titles) of
 """
 def get_assignment_id_to_names(gradescope_client):
     # The response cannot be parsed as a json as is.
-    course_info_response = str(get_assignment_info(gradescope_client, COURSE_ID)).replace("\\\\", "\\")
-    pattern = '{"id":[0-9]+,"title":"[\w,:\+\s()]+?"}'
+    course_info_response = str(get_assignment_info(gradescope_client, COURSE_ID)).replace("\\\\", "\\").replace("\\u0026", "&")
+    pattern = '{"id":[0-9]+,"title":"[\w,:\+\s()\&\-]+?"}'
     info_for_all_assignments = re.findall(pattern, course_info_response)
     assignment_to_names = { str(json.loads(assignment)['id']) : json.loads(assignment)['title'] for assignment in info_for_all_assignments }
     return assignment_to_names
 
 def main():
-    creds = allow_user_to_authenticate_google_account()
-    gradescope_client = initialize_gs_client()
-    make_score_sheet_for_one_assignment(creds, gradescope_client = gradescope_client)
+    populate_instructor_dashboard()
+    #creds = allow_user_to_authenticate_google_account()
+    #gradescope_client = initialize_gs_client()
+    #make_score_sheet_for_one_assignment(creds, gradescope_client = gradescope_client)
 
 def populate_instructor_dashboard():
     creds = allow_user_to_authenticate_google_account()
@@ -175,14 +179,18 @@ def populate_instructor_dashboard():
     sub_sheet_titles_to_ids = get_sub_sheet_titles_to_ids(sheet_api_instance)
     dashboard_sheet_id = sub_sheet_titles_to_ids['Instructor_Dashboard']
     dashboard_dict = {}
+    #lab_average_column = [f"=ARRAYFORMULA(AVERAGE(FILTER(E{i + 2}:AM{i + 2}, REGEXMATCH(E1:1, \"Lab\")))) * 500" for i in range(NUMBER_OF_STUDENTS)]
 
-    #lab_average_column = ["Average Lab Score"]
+    lab_score_column = [f"=ARRAYFORMULA(COUNTIF(A2:Z2, 1)) * 100" for i
+                          in range(NUMBER_OF_STUDENTS)]
 
-    #for first_element, second_element in zip(sorted_labs[0::2], sorted_labs[1::2]):
-     #   print(first_element, second_element)
+    lab_score_dict = {"Total Lab Score / 100" : lab_score_column}
 
     all_lab_ids = set()
     paired_lab_ids = set()
+
+    for id in assignment_id_to_names:
+        make_score_sheet_for_one_assignment(creds, gradescope_client=gradescope_client, assignment_id=id)
 
     for i in range(len(sorted_labs) - 1):
         first_element = sorted_labs[i]
@@ -193,40 +201,48 @@ def populate_instructor_dashboard():
         second_element_lab_number = extract_number_from_lab_title(second_element)
         all_lab_ids.add(first_element_assignment_id)
         all_lab_ids.add(second_element_assignment_id)
-        #make_score_sheet_for_one_assignment(creds, gradescope_client=gradescope_client, assignment_id=first_element_assignment_id)
         # If this is the last iteration, we need to make the sheet for the second_element, to ensure that it is not excluded.
-        if i == len(sorted_labs) - 2:
-            pass
-            #make_score_sheet_for_one_assignment(creds, gradescope_client=gradescope_client, assignment_id=second_element_assignment_id)
 
         if first_element_lab_number == second_element_lab_number:
             paired_lab_ids.add(first_element_assignment_id)
             paired_lab_ids.add(second_element_assignment_id)
-            spreadsheet_query = f"=DIVIDE(XLOOKUP(A:A, {first_element_assignment_id}!A:A, {first_element_assignment_id}!E:E) + XLOOKUP(A:A, {second_element_assignment_id}!A:A, {second_element_assignment_id}!E:E), XLOOKUP(A:A, {first_element_assignment_id}!A:A, {first_element_assignment_id}!F:F) + XLOOKUP(A:A, {second_element_assignment_id}!A:A, {second_element_assignment_id}!F:F))"
+            if first_element_lab_number in SPECIAL_CASE_LABS:
+                continue
+            spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {first_element_assignment_id}!C:C, {first_element_assignment_id}!E:E) + XLOOKUP(C:C, {second_element_assignment_id}!C:C, {second_element_assignment_id}!E:E), XLOOKUP(C:C, {first_element_assignment_id}!C:C, {first_element_assignment_id}!F:F) + XLOOKUP(C:C, {second_element_assignment_id}!C:C, {second_element_assignment_id}!F:F))"
             dashboard_dict["Lab " + str(first_element_lab_number)] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
     unpaired_lab_ids = all_lab_ids - paired_lab_ids
 
     for lab_id in unpaired_lab_ids:
-        #make_score_sheet_for_one_assignment(creds,gradescope_client = gradescope_client, assignment_id= assignment_id)
         spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {lab_id}!C:C, {lab_id}!E:E), XLOOKUP(C:C, {lab_id}!C:C, {lab_id}!F:F))"
         lab_number = extract_number_from_lab_title(assignment_id_to_names[lab_id])
         dashboard_dict["Lab " + str(lab_number)] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+
+
+    for lab_number in SPECIAL_CASE_LABS:
+        special_case_lab_name = "Lab " + str(lab_number)
+        special_lab_ids = []
+        for lab_name in sorted_labs:
+            if special_case_lab_name in lab_name:
+                special_lab_ids.append(assignment_names_to_ids[lab_name])
+        spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {special_lab_ids[0]}!C:C, {special_lab_ids[0]}!E:E) + XLOOKUP(C:C, {special_lab_ids[1]}!C:C, {special_lab_ids[1]}!E:E) + XLOOKUP(C:C, {special_lab_ids[2]}!C:C, {special_lab_ids[2]}!E:E) + XLOOKUP(C:C, {special_lab_ids[3]}!C:C, {special_lab_ids[3]}!E:E), XLOOKUP(C:C, {special_lab_ids[0]}!C:C, {special_lab_ids[0]}!F:F) + XLOOKUP(C:C, {special_lab_ids[1]}!C:C, {special_lab_ids[1]}!F:F) + XLOOKUP(C:C, {special_lab_ids[2]}!C:C, {special_lab_ids[2]}!F:F) + XLOOKUP(C:C, {special_lab_ids[3]}!C:C, {special_lab_ids[3]}!F:F))"
+        dashboard_dict[special_case_lab_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
     dashboard_dict = dict(sorted(dashboard_dict.items(), key=lambda lab: int(re.findall("\d+", lab[0])[0])))
 
     for assignment_name in sorted_projects:
         assignment_id = assignment_names_to_ids[assignment_name]
-        #make_score_sheet_for_one_assignment(creds,gradescope_client = gradescope_client, assignment_id= assignment_id)
         spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
         dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
-    first_column_name = "Lab " + str(extract_number_from_lab_title(sorted_labs[0]))
-    dashboard_df = pd.DataFrame(dashboard_dict).set_index(first_column_name)
+    lab_score_dict.update(dashboard_dict)
+    dashboard_dict_with_lab_avg = lab_score_dict
+
+    first_column_name = "Total Lab Score / 100" #"Lab " + str(extract_number_from_lab_title(sorted_labs[0]))
+    dashboard_df = pd.DataFrame(dashboard_dict_with_lab_avg).set_index(first_column_name)
     output = io.StringIO()
     dashboard_df.to_csv(output)
     update_sheet_with_csv(output.getvalue(), sheet_api_instance, dashboard_sheet_id, 0, 3)
     output.close()
 
-
-populate_instructor_dashboard()
+main()
