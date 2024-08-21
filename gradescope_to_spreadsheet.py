@@ -149,10 +149,14 @@ This method returns a dictionary mapping assignment IDs to the names (titles) of
 """
 def get_assignment_id_to_names(gradescope_client):
     # The response cannot be parsed as a json as is.
-    course_info_response = str(get_assignment_info(gradescope_client, COURSE_ID)).replace("\\\\", "\\").replace("\\u0026", "&")
-    pattern = '{"id":[0-9]+,"title":"[\w,:\+\s()\&\-]+?"}'
+    course_info_response = str(get_assignment_info(gradescope_client, COURSE_ID)).replace("\\", "").replace("\\u0026", "&")
+    pattern = '{"id":[0-9]+,"title":"[^}"]+?"}'
     info_for_all_assignments = re.findall(pattern, course_info_response)
-    assignment_to_names = { str(json.loads(assignment)['id']) : json.loads(assignment)['title'] for assignment in info_for_all_assignments }
+    assignment_to_names = {}
+    #  = { json.loads(assignment)['id'] : json.loads(assignment)['title'] for assignment in info_for_all_assignments }
+    for assignment in info_for_all_assignments:
+        assignment_as_json = json.loads(assignment)
+        assignment_to_names[assignment_as_json["id"]] = assignment_as_json["title"]
     return assignment_to_names
 
 def main():
