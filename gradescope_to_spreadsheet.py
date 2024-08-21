@@ -59,9 +59,6 @@ def allow_user_to_authenticate_google_account():
 
 def writeToSheet(sheet_api_instance, assignment_scores, assignment_id = ASSIGNMENT_ID):
     try:
-
-        #sheet_api_instance = create_sheet_api_instance(creds)
-
         sub_sheet_titles_to_ids = get_sub_sheet_titles_to_ids(sheet_api_instance)
 
         sheet_id = None
@@ -192,8 +189,7 @@ def populate_instructor_dashboard():
     paired_lab_ids = set()
 
     for id in assignment_id_to_names:
-        pass
-        #make_score_sheet_for_one_assignment(sheet_api_instance, gradescope_client=gradescope_client, assignment_id=id)
+        make_score_sheet_for_one_assignment(sheet_api_instance, gradescope_client=gradescope_client, assignment_id=id)
 
     for i in range(len(sorted_labs) - 1):
         first_element = sorted_labs[i]
