@@ -21,7 +21,9 @@ ASSIGNMENT_ID = (len(sys.argv) > 1) and sys.argv[1]
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1kaC1SyYCbQKyZByxu_sX96D-bdGAlMrFWqLXKrivcxU" #"1yrHEpO5dOMutG6mfDRwauxqT6F0nirqFAEdqMn8kRhU"
 NUMBER_OF_STUDENTS = 77
+# Lab number of labs that are not graded.
 UNGRADED_LABS = [12]
+TOTAL_LAB_POINTS = 100
 
 # Used for labs with 4 parts (very uncommon)
 SPECIAL_CASE_LABS = [16]
@@ -185,15 +187,6 @@ def populate_instructor_dashboard():
     sub_sheet_titles_to_ids = get_sub_sheet_titles_to_ids(sheet_api_instance)
     dashboard_sheet_id = sub_sheet_titles_to_ids['Instructor_Dashboard']
     dashboard_dict = {}
-    #lab_average_column = [f"=ARRAYFORMULA(AVERAGE(FILTER(E{i + 2}:AM{i + 2}, REGEXMATCH(E1:1, \"Lab\")))) * 500" for i in range(NUMBER_OF_STUDENTS)]
-
-    num_labs = len(sorted_labs) - len(UNGRADED_LABS)
-
-    lab_score_column = [f"=ARRAYFORMULA(COUNTIF(FILTER(E{i + 2}:{i + 2}, REGEXMATCH(E1:1, \"Lab\")), 1) / {str(num_labs)} * 100)" for i in range(NUMBER_OF_STUDENTS)]
-    lab_score_title = "All-Or-Nothing-Lab Score / 100"
-    lab_score_dict = {lab_score_title : lab_score_column}
-
-
 
     all_lab_ids = set()
     paired_lab_ids = set()
@@ -238,18 +231,36 @@ def populate_instructor_dashboard():
         spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {special_lab_ids[0]}!C:C, {special_lab_ids[0]}!E:E) + XLOOKUP(C:C, {special_lab_ids[1]}!C:C, {special_lab_ids[1]}!E:E) + XLOOKUP(C:C, {special_lab_ids[2]}!C:C, {special_lab_ids[2]}!E:E) + XLOOKUP(C:C, {special_lab_ids[3]}!C:C, {special_lab_ids[3]}!E:E), XLOOKUP(C:C, {special_lab_ids[0]}!C:C, {special_lab_ids[0]}!F:F) + XLOOKUP(C:C, {special_lab_ids[1]}!C:C, {special_lab_ids[1]}!F:F) + XLOOKUP(C:C, {special_lab_ids[2]}!C:C, {special_lab_ids[2]}!F:F) + XLOOKUP(C:C, {special_lab_ids[3]}!C:C, {special_lab_ids[3]}!F:F))"
         dashboard_dict[special_case_lab_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
-    dashboard_dict = dict(sorted(dashboard_dict.items(), key=lambda lab: int(re.findall("\d+", lab[0])[0])))
+    num_graded_labs = len(dashboard_dict) - len(UNGRADED_LABS)
+
+    lab_score_column = [f"=ARRAYFORMULA(COUNTIF(FILTER(H{i + 2}:{i + 2}, REGEXMATCH(H1:1, \"Lab\")), 1) / {num_graded_labs} * {TOTAL_LAB_POINTS})" for i in range(NUMBER_OF_STUDENTS)]
+    lab_score_title = "Su24CS10 Final Lab Score / 100"
+    lab_score_dict = {lab_score_title : lab_score_column}
+
+    number_of_full_credit_labs = [f"=ARRAYFORMULA(COUNTIF(FILTER(H{i + 2}:{i + 2}, REGEXMATCH(H1:1, \"Lab\")), 1))" for i in range(NUMBER_OF_STUDENTS)]
+    number_of_full_credit_labs_dict = {"# of full credit labs" : number_of_full_credit_labs}
+
+    lab_average_column = [f"=ARRAYFORMULA(AVERAGE(FILTER(H{i + 2}:AM{i + 2}, REGEXMATCH(H1:1, \"Lab\"))))" for i in range(NUMBER_OF_STUDENTS)]
+    lab_average_dict = {"Avg. Lab Score" : lab_average_column}
+
+    project_average_column = [f"=ARRAYFORMULA(AVERAGE(FILTER(H{i + 2}:AM{i + 2}, REGEXMATCH(H1:1, \"Project\"))))" for i in range(NUMBER_OF_STUDENTS)]
+    project_average_dict = {"Avg. Project Score" : project_average_column}
+
 
     for assignment_name in sorted_projects:
         assignment_id = assignment_names_to_ids[assignment_name]
         spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
         dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
-    lab_score_dict.update(dashboard_dict)
-    dashboard_dict_with_lab_avg = lab_score_dict
+    dashboard_dict_with_aggregate_columns = {}
+    dashboard_dict_with_aggregate_columns.update(lab_score_dict)
+    dashboard_dict_with_aggregate_columns.update(number_of_full_credit_labs_dict)
+    dashboard_dict_with_aggregate_columns.update(lab_average_dict)
+    dashboard_dict_with_aggregate_columns.update(project_average_dict)
+    dashboard_dict_with_aggregate_columns.update(dashboard_dict)
 
     first_column_name = lab_score_title #"Lab " + str(extract_number_from_lab_title(sorted_labs[0]))
-    dashboard_df = pd.DataFrame(dashboard_dict_with_lab_avg).set_index(first_column_name)
+    dashboard_df = pd.DataFrame(dashboard_dict_with_aggregate_columns).set_index(first_column_name)
     output = io.StringIO()
     dashboard_df.to_csv(output)
     update_sheet_with_csv(output.getvalue(), sheet_api_instance, dashboard_sheet_id, 0, 3)
