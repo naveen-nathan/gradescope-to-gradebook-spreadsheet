@@ -21,6 +21,7 @@ ASSIGNMENT_ID = (len(sys.argv) > 1) and sys.argv[1]
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1kaC1SyYCbQKyZByxu_sX96D-bdGAlMrFWqLXKrivcxU" #"1yrHEpO5dOMutG6mfDRwauxqT6F0nirqFAEdqMn8kRhU"
 NUMBER_OF_STUDENTS = 77
+UNGRADED_LABS = [12]
 
 # Used for labs with 4 parts (very uncommon)
 SPECIAL_CASE_LABS = [16]
@@ -186,16 +187,20 @@ def populate_instructor_dashboard():
     dashboard_dict = {}
     #lab_average_column = [f"=ARRAYFORMULA(AVERAGE(FILTER(E{i + 2}:AM{i + 2}, REGEXMATCH(E1:1, \"Lab\")))) * 500" for i in range(NUMBER_OF_STUDENTS)]
 
-    lab_score_column = [f"=ARRAYFORMULA(COUNTIF(A2:Z2, 1)) * 100" for i
-                          in range(NUMBER_OF_STUDENTS)]
+    num_labs = len(sorted_labs) - len(UNGRADED_LABS)
 
-    lab_score_dict = {"Total Lab Score / 100" : lab_score_column}
+    lab_score_column = [f"=ARRAYFORMULA(COUNTIF(FILTER(E{i + 2}:{i + 2}, REGEXMATCH(E1:1, \"Lab\")), 1) / {str(num_labs)} * 100)" for i in range(NUMBER_OF_STUDENTS)]
+    lab_score_title = "All-Or-Nothing-Lab Score / 100"
+    lab_score_dict = {lab_score_title : lab_score_column}
+
+
 
     all_lab_ids = set()
     paired_lab_ids = set()
 
     for id in assignment_id_to_names:
-        make_score_sheet_for_one_assignment(sheet_api_instance, gradescope_client=gradescope_client, assignment_id=id)
+        pass
+        #make_score_sheet_for_one_assignment(sheet_api_instance, gradescope_client=gradescope_client, assignment_id=id)
 
     for i in range(len(sorted_labs) - 1):
         first_element = sorted_labs[i]
@@ -204,10 +209,10 @@ def populate_instructor_dashboard():
         second_element_assignment_id = assignment_names_to_ids[second_element]
         first_element_lab_number = extract_number_from_lab_title(first_element)
         second_element_lab_number = extract_number_from_lab_title(second_element)
+        if first_element_lab_number in UNGRADED_LABS:
+            continue
         all_lab_ids.add(first_element_assignment_id)
         all_lab_ids.add(second_element_assignment_id)
-        # If this is the last iteration, we need to make the sheet for the second_element, to ensure that it is not excluded.
-
         if first_element_lab_number == second_element_lab_number:
             paired_lab_ids.add(first_element_assignment_id)
             paired_lab_ids.add(second_element_assignment_id)
@@ -243,7 +248,7 @@ def populate_instructor_dashboard():
     lab_score_dict.update(dashboard_dict)
     dashboard_dict_with_lab_avg = lab_score_dict
 
-    first_column_name = "Total Lab Score / 100" #"Lab " + str(extract_number_from_lab_title(sorted_labs[0]))
+    first_column_name = lab_score_title #"Lab " + str(extract_number_from_lab_title(sorted_labs[0]))
     dashboard_df = pd.DataFrame(dashboard_dict_with_lab_avg).set_index(first_column_name)
     output = io.StringIO()
     dashboard_df.to_csv(output)
