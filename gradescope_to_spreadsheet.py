@@ -289,7 +289,7 @@ def populate_instructor_dashboard():
     dashboard_df = pd.DataFrame(dashboard_dict_with_aggregate_columns).set_index(first_column_name)
     output = io.StringIO()
     dashboard_df.to_csv(output)
-    #update_sheet_with_csv(output.getvalue(), sheet_api_instance, dashboard_sheet_id, 0, 3)
+    update_sheet_with_csv(output.getvalue(), sheet_api_instance, dashboard_sheet_id, 0, 3)
     output.close()
 
 main()
