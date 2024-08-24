@@ -20,7 +20,7 @@ from googleapiclient.errors import HttpError
 COURSE_ID = "782967"
 # This scope allows for write access.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "1bpGPdtyaIgMUTFYLgdo_Nr19-0nCC9UD-aa6ZjfNIZI"
+SPREADSHEET_ID = "1Ke-CBw93WkzuX5rYndjrlbyZ31V9jzadNZJP4J98r2k"#"1bpGPdtyaIgMUTFYLgdo_Nr19-0nCC9UD-aa6ZjfNIZI"
 NUMBER_OF_STUDENTS = 77
 # Lab number of labs that are not graded.
 UNGRADED_LABS = [12]
@@ -209,7 +209,7 @@ def populate_instructor_dashboard():
     for id in assignment_id_to_names:
         assignment_scores = make_score_sheet_for_one_assignment(sheet_api_instance, gradescope_client=gradescope_client, assignment_id=id)
         if assignment_scores.count("Graded") >= 3:
-            assignment_id_to_currency_status[assignment_id_to_names] = assignment_scores
+            assignment_id_to_currency_status[id] = assignment_scores
 
     for i in range(len(sorted_labs) - 1):
         first_element = sorted_labs[i]
@@ -227,21 +227,21 @@ def populate_instructor_dashboard():
             paired_lab_ids.add(second_element_assignment_id)
             if first_element_lab_number in SPECIAL_CASE_LABS:
                 continue
-            if assignment_id_to_currency_status[assignment_id_to_names]:
+            if assignment_id_to_currency_status[id]:
                 spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {first_element_assignment_id}!C:C, {first_element_assignment_id}!E:E) + XLOOKUP(C:C, {second_element_assignment_id}!C:C, {second_element_assignment_id}!E:E), XLOOKUP(C:C, {first_element_assignment_id}!C:C, {first_element_assignment_id}!F:F) + XLOOKUP(C:C, {second_element_assignment_id}!C:C, {second_element_assignment_id}!F:F))"
                 dashboard_dict["Lab " + str(first_element_lab_number)] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
     unpaired_lab_ids = all_lab_ids - paired_lab_ids
 
     for lab_id in unpaired_lab_ids:
-        if assignment_id_to_currency_status[assignment_id_to_names]:
+        if assignment_id_to_currency_status[id]:
             spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {lab_id}!C:C, {lab_id}!E:E), XLOOKUP(C:C, {lab_id}!C:C, {lab_id}!F:F))"
             lab_number = extract_number_from_lab_title(assignment_id_to_names[lab_id])
             dashboard_dict["Lab " + str(lab_number)] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
 
     for lab_number in SPECIAL_CASE_LABS:
-        if assignment_id_to_currency_status[assignment_id_to_names]:
+        if assignment_id_to_currency_status[id]:
             special_case_lab_name = "Lab " + str(lab_number)
             special_lab_ids = []
             for lab_name in sorted_labs:
@@ -272,19 +272,19 @@ def populate_instructor_dashboard():
     discussion_makeup_count_dict = {"Su24CS10 Number of Discussion Makeups" : discussion_makeup_count}
 
     for assignment_name in sorted_projects:
-        if assignment_id_to_currency_status[assignment_id_to_names]:
+        if assignment_id_to_currency_status[id]:
             assignment_id = assignment_names_to_ids[assignment_name]
             spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
             dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
     for assignment_name in lecture_quizzes:
-        if assignment_id_to_currency_status[assignment_id_to_names]:
+        if assignment_id_to_currency_status[id]:
             assignment_id = assignment_names_to_ids[assignment_name]
             spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
             dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
     for assignment_name in discussions:
-        if assignment_id_to_currency_status[assignment_id_to_names]:
+        if assignment_id_to_currency_status[id]:
             assignment_id = assignment_names_to_ids[assignment_name]
             spreadsheet_query = f"=IF(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!G:G) <> \"Missing\", 1, 0)"
             dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
