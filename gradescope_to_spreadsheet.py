@@ -1,3 +1,5 @@
+# Author: Naveen Nathan
+
 import json
 
 from fullGSapi.api import client
@@ -16,19 +18,18 @@ from googleapiclient.errors import HttpError
 
 # CS10 Su24 course id
 COURSE_ID = "782967"
-# User provided ASSIGNMENT_ID
-ASSIGNMENT_ID = (len(sys.argv) > 1) and sys.argv[1]
 # This scope allows for write access.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1bpGPdtyaIgMUTFYLgdo_Nr19-0nCC9UD-aa6ZjfNIZI"
 NUMBER_OF_STUDENTS = 77
 # Lab number of labs that are not graded.
 UNGRADED_LABS = [12]
+# Used only for Final grade calculation; not for display in the middle of the semester
 TOTAL_LAB_POINTS = 100
+NUM_LECTURES = 24
 
 # Used for labs with 4 parts (very uncommon)
 SPECIAL_CASE_LABS = [16]
-NUM_LECTURES = 20
 NUM_LECTURE_DROPS = 3
 
 """
@@ -250,7 +251,7 @@ def populate_instructor_dashboard():
     project_average_column = [f"=ARRAYFORMULA(AVERAGE(FILTER(J{i + 2}:{i + 2}, REGEXMATCH(J1:1, \"Project\"))))" for i in range(NUMBER_OF_STUDENTS)]
     project_average_dict = {"Avg. Project Score" : project_average_column}
 
-    lecture_attendance_score = [f"=ARRAYFORMULA((COUNTIF(FILTER(I{i + 2}:{i + 2}, REGEXMATCH(I1:1, \"Lecture\")), 1) + {NUM_LECTURE_DROPS}) / {NUM_LECTURES})" for i in range(NUMBER_OF_STUDENTS)]
+    lecture_attendance_score = [f"=ARRAYFORMULA((COUNTIF(FILTER(I{i + 2}:{i + 2}, REGEXMATCH(I1:1, \"Lecture\")), 1) + {NUM_LECTURE_DROPS}) / {len(lecture_quizzes)})" for i in range(NUMBER_OF_STUDENTS)]
     lecture_quiz_count_dict = {"Su24CS10 Final Lecture Attendance Score (Drops Included)" : lecture_attendance_score}
 
     discussion_makeup_count = [f"=ARRAYFORMULA(COUNTIF(FILTER(I{i + 2}:{i + 2}, REGEXMATCH(I1:1, \"Discussion\")), 1))" for i in range(NUMBER_OF_STUDENTS)]
@@ -268,7 +269,7 @@ def populate_instructor_dashboard():
 
     for assignment_name in discussions:
         assignment_id = assignment_names_to_ids[assignment_name]
-        spreadsheet_query = f"=IF(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!G:G) <> \"Missing\", 1, 0)" #f"XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
+        spreadsheet_query = f"=IF(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!G:G) <> \"Missing\", 1, 0)"
         dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
 
