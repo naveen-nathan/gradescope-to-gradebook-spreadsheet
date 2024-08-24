@@ -32,7 +32,7 @@ NUM_LECTURES = 24
 SPECIAL_CASE_LABS = [16]
 NUM_LECTURE_DROPS = 3
 
-# The ASSIGNMENT_ID constant is for users who wish to run the script on only one assignment, passing it as a parameter. This functionality is not yet implemented
+# The ASSIGNMENT_ID constant is for users who wish to generate a sub-sheet (not update the dashboard) for one assignment, passing it as a parameter.
 ASSIGNMENT_ID = (len(sys.argv) > 1) and sys.argv[1]
 
 """
@@ -167,10 +167,12 @@ def get_assignment_id_to_names(gradescope_client):
     return assignment_to_names
 
 def main():
+    if len(sys.argv) > 1:
+        creds = allow_user_to_authenticate_google_account()
+        gradescope_client = initialize_gs_client()
+        make_score_sheet_for_one_assignment(creds, gradescope_client = gradescope_client)
     populate_instructor_dashboard()
-    #creds = allow_user_to_authenticate_google_account()
-    #gradescope_client = initialize_gs_client()
-    #make_score_sheet_for_one_assignment(creds, gradescope_client = gradescope_client)
+
 
 def populate_instructor_dashboard():
     creds = allow_user_to_authenticate_google_account()
