@@ -20,7 +20,7 @@ from googleapiclient.errors import HttpError
 COURSE_ID = "782967"
 # This scope allows for write access.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "1bpGPdtyaIgMUTFYLgdo_Nr19-0nCC9UD-aa6ZjfNIZI"
+#SPREADSHEET_ID = "1bpGPdtyaIgMUTFYLgdo_Nr19-0nCC9UD-aa6ZjfNIZI"
 NUMBER_OF_STUDENTS = 77
 # Lab number of labs that are not graded.
 UNGRADED_LABS = [12]
@@ -31,6 +31,9 @@ NUM_LECTURES = 24
 # Used for labs with 4 parts (very uncommon)
 SPECIAL_CASE_LABS = [16]
 NUM_LECTURE_DROPS = 3
+
+# The ASSIGNMENT_ID constant is for users who wish to run the script on only one assignment, passing it as a parameter. This functionality is not yet implemented
+ASSIGNMENT_ID = (len(sys.argv) > 1) and sys.argv[1]
 
 """
 Allows the user authenticate their google account, allowing the script to modify spreadsheets in their name.
@@ -286,7 +289,8 @@ def populate_instructor_dashboard():
     dashboard_df = pd.DataFrame(dashboard_dict_with_aggregate_columns).set_index(first_column_name)
     output = io.StringIO()
     dashboard_df.to_csv(output)
-    update_sheet_with_csv(output.getvalue(), sheet_api_instance, dashboard_sheet_id, 0, 3)
+    #update_sheet_with_csv(output.getvalue(), sheet_api_instance, dashboard_sheet_id, 0, 3)
     output.close()
 
 main()
+
