@@ -20,7 +20,7 @@ from googleapiclient.errors import HttpError
 COURSE_ID = "782967"
 # This scope allows for write access.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "1Ke-CBw93WkzuX5rYndjrlbyZ31V9jzadNZJP4J98r2k"#"1bpGPdtyaIgMUTFYLgdo_Nr19-0nCC9UD-aa6ZjfNIZI"
+SPREADSHEET_ID = "1Ke-CBw93WkzuX5rYndjrlbyZ31V9jzadNZJP4J98r2k"
 NUMBER_OF_STUDENTS = 77
 # Lab number of labs that are not graded.
 UNGRADED_LABS = [12]
@@ -34,6 +34,9 @@ NUM_LECTURE_DROPS = 3
 
 # The ASSIGNMENT_ID constant is for users who wish to generate a sub-sheet (not update the dashboard) for one assignment, passing it as a parameter.
 ASSIGNMENT_ID = (len(sys.argv) > 1) and sys.argv[1]
+
+# This is not a constant; it is a variable that needs global scope. It should not be modified by the user
+subsheet_titles_to_ids = None
 
 """
 Allows the user authenticate their google account, allowing the script to modify spreadsheets in their name.
@@ -84,9 +87,9 @@ def writeToSheet(sheet_api_instance, assignment_scores, assignment_id = ASSIGNME
             sheet_id = response['replies'][0]['addSheet']['properties']['sheetId']
         else:
             sheet_id = sub_sheet_titles_to_ids[assignment_id]
+        time.sleep(5)
         update_sheet_with_csv(assignment_scores, sheet_api_instance, sheet_id)
         print("Successfully updated spreadsheet with new score data")
-        time.sleep(10)
     except HttpError as err:
         print(err)
 
@@ -98,6 +101,9 @@ def create_sheet_api_instance(creds):
 
 
 def get_sub_sheet_titles_to_ids(sheet_api_instance):
+    global subsheet_titles_to_ids
+    if subsheet_titles_to_ids:
+        return subsheet_titles_to_ids
     sheets = sheet_api_instance.get(spreadsheetId=SPREADSHEET_ID, fields='sheets/properties').execute()
     sub_sheet_titles_to_ids = {sheet['properties']['title']: sheet['properties']['sheetId'] for sheet in
                                sheets['sheets']}
@@ -125,7 +131,6 @@ def update_sheet_with_csv(assignment_scores, sheet_api_instance, sheet_id, rowIn
 
 
 def retrieve_grades_from_gradescope(gradescope_client, assignment_id = ASSIGNMENT_ID):
-    #gradescope_client = initialize_gs_client()
     assignment_scores = str(gradescope_client.download_scores(COURSE_ID, assignment_id)).replace("\\n", "\n")
     return assignment_scores
 
@@ -190,8 +195,8 @@ def populate_instructor_dashboard():
                   assignment_id_to_names.values()))
     sorted_projects = sorted(projects, key=lambda project: assignment_names_to_ids[project])
 
-    lecture_quizzes = filter(lambda assignment: "lecture" in assignment.lower(),
-                  assignment_id_to_names.values())
+    lecture_quizzes = list(filter(lambda assignment: "lecture" in assignment.lower(),
+                  assignment_id_to_names.values()))
 
     discussions = filter(lambda assignment: "discussion" in assignment.lower(),
                   assignment_id_to_names.values())
