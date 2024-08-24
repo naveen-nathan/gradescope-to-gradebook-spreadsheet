@@ -150,6 +150,7 @@ def get_assignment_info(gs_instance, class_id: str) -> bytes:
 def make_score_sheet_for_one_assignment(sheet_api_instance, gradescope_client, assignment_id = ASSIGNMENT_ID):
     assignment_scores = retrieve_grades_from_gradescope(gradescope_client = gradescope_client, assignment_id = assignment_id)
     writeToSheet(sheet_api_instance, assignment_scores, assignment_id)
+    return assignment_scores
 
 """
 This method returns a dictionary mapping assignment IDs to the names (titles) of the assignments
@@ -202,8 +203,12 @@ def populate_instructor_dashboard():
     all_lab_ids = set()
     paired_lab_ids = set()
 
+    assignment_id_to_currency_status = {}
+
     for id in assignment_id_to_names:
-        make_score_sheet_for_one_assignment(sheet_api_instance, gradescope_client=gradescope_client, assignment_id=id)
+        assignment_scores = make_score_sheet_for_one_assignment(sheet_api_instance, gradescope_client=gradescope_client, assignment_id=id)
+        if assignment_scores.count("Graded") >= 3:
+            assignment_id_to_currency_status[assignment_id_to_names] = assignment_scores
 
     for i in range(len(sorted_labs) - 1):
         first_element = sorted_labs[i]
@@ -221,25 +226,28 @@ def populate_instructor_dashboard():
             paired_lab_ids.add(second_element_assignment_id)
             if first_element_lab_number in SPECIAL_CASE_LABS:
                 continue
-            spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {first_element_assignment_id}!C:C, {first_element_assignment_id}!E:E) + XLOOKUP(C:C, {second_element_assignment_id}!C:C, {second_element_assignment_id}!E:E), XLOOKUP(C:C, {first_element_assignment_id}!C:C, {first_element_assignment_id}!F:F) + XLOOKUP(C:C, {second_element_assignment_id}!C:C, {second_element_assignment_id}!F:F))"
-            dashboard_dict["Lab " + str(first_element_lab_number)] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+            if assignment_id_to_currency_status[assignment_id_to_names]:
+                spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {first_element_assignment_id}!C:C, {first_element_assignment_id}!E:E) + XLOOKUP(C:C, {second_element_assignment_id}!C:C, {second_element_assignment_id}!E:E), XLOOKUP(C:C, {first_element_assignment_id}!C:C, {first_element_assignment_id}!F:F) + XLOOKUP(C:C, {second_element_assignment_id}!C:C, {second_element_assignment_id}!F:F))"
+                dashboard_dict["Lab " + str(first_element_lab_number)] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
     unpaired_lab_ids = all_lab_ids - paired_lab_ids
 
     for lab_id in unpaired_lab_ids:
-        spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {lab_id}!C:C, {lab_id}!E:E), XLOOKUP(C:C, {lab_id}!C:C, {lab_id}!F:F))"
-        lab_number = extract_number_from_lab_title(assignment_id_to_names[lab_id])
-        dashboard_dict["Lab " + str(lab_number)] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+        if assignment_id_to_currency_status[assignment_id_to_names]:
+            spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {lab_id}!C:C, {lab_id}!E:E), XLOOKUP(C:C, {lab_id}!C:C, {lab_id}!F:F))"
+            lab_number = extract_number_from_lab_title(assignment_id_to_names[lab_id])
+            dashboard_dict["Lab " + str(lab_number)] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
 
     for lab_number in SPECIAL_CASE_LABS:
-        special_case_lab_name = "Lab " + str(lab_number)
-        special_lab_ids = []
-        for lab_name in sorted_labs:
-            if special_case_lab_name in lab_name:
-                special_lab_ids.append(assignment_names_to_ids[lab_name])
-        spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {special_lab_ids[0]}!C:C, {special_lab_ids[0]}!E:E) + XLOOKUP(C:C, {special_lab_ids[1]}!C:C, {special_lab_ids[1]}!E:E) + XLOOKUP(C:C, {special_lab_ids[2]}!C:C, {special_lab_ids[2]}!E:E) + XLOOKUP(C:C, {special_lab_ids[3]}!C:C, {special_lab_ids[3]}!E:E), XLOOKUP(C:C, {special_lab_ids[0]}!C:C, {special_lab_ids[0]}!F:F) + XLOOKUP(C:C, {special_lab_ids[1]}!C:C, {special_lab_ids[1]}!F:F) + XLOOKUP(C:C, {special_lab_ids[2]}!C:C, {special_lab_ids[2]}!F:F) + XLOOKUP(C:C, {special_lab_ids[3]}!C:C, {special_lab_ids[3]}!F:F))"
-        dashboard_dict[special_case_lab_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+        if assignment_id_to_currency_status[assignment_id_to_names]:
+            special_case_lab_name = "Lab " + str(lab_number)
+            special_lab_ids = []
+            for lab_name in sorted_labs:
+                if special_case_lab_name in lab_name:
+                    special_lab_ids.append(assignment_names_to_ids[lab_name])
+            spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {special_lab_ids[0]}!C:C, {special_lab_ids[0]}!E:E) + XLOOKUP(C:C, {special_lab_ids[1]}!C:C, {special_lab_ids[1]}!E:E) + XLOOKUP(C:C, {special_lab_ids[2]}!C:C, {special_lab_ids[2]}!E:E) + XLOOKUP(C:C, {special_lab_ids[3]}!C:C, {special_lab_ids[3]}!E:E), XLOOKUP(C:C, {special_lab_ids[0]}!C:C, {special_lab_ids[0]}!F:F) + XLOOKUP(C:C, {special_lab_ids[1]}!C:C, {special_lab_ids[1]}!F:F) + XLOOKUP(C:C, {special_lab_ids[2]}!C:C, {special_lab_ids[2]}!F:F) + XLOOKUP(C:C, {special_lab_ids[3]}!C:C, {special_lab_ids[3]}!F:F))"
+            dashboard_dict[special_case_lab_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
     num_graded_labs = len(dashboard_dict) - len(UNGRADED_LABS)
 
@@ -263,19 +271,22 @@ def populate_instructor_dashboard():
     discussion_makeup_count_dict = {"Su24CS10 Number of Discussion Makeups" : discussion_makeup_count}
 
     for assignment_name in sorted_projects:
-        assignment_id = assignment_names_to_ids[assignment_name]
-        spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
-        dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+        if assignment_id_to_currency_status[assignment_id_to_names]:
+            assignment_id = assignment_names_to_ids[assignment_name]
+            spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
+            dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
     for assignment_name in lecture_quizzes:
-        assignment_id = assignment_names_to_ids[assignment_name]
-        spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
-        dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+        if assignment_id_to_currency_status[assignment_id_to_names]:
+            assignment_id = assignment_names_to_ids[assignment_name]
+            spreadsheet_query = f"=DIVIDE(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!E:E), XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!F:F))"
+            dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
     for assignment_name in discussions:
-        assignment_id = assignment_names_to_ids[assignment_name]
-        spreadsheet_query = f"=IF(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!G:G) <> \"Missing\", 1, 0)"
-        dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
+        if assignment_id_to_currency_status[assignment_id_to_names]:
+            assignment_id = assignment_names_to_ids[assignment_name]
+            spreadsheet_query = f"=IF(XLOOKUP(C:C, {assignment_id}!C:C, {assignment_id}!G:G) <> \"Missing\", 1, 0)"
+            dashboard_dict[assignment_name] = [spreadsheet_query] * NUMBER_OF_STUDENTS
 
 
     dashboard_dict_with_aggregate_columns = {}
