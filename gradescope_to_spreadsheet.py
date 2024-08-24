@@ -20,7 +20,7 @@ from googleapiclient.errors import HttpError
 COURSE_ID = "782967"
 # This scope allows for write access.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-#SPREADSHEET_ID = "1bpGPdtyaIgMUTFYLgdo_Nr19-0nCC9UD-aa6ZjfNIZI"
+SPREADSHEET_ID = "1bpGPdtyaIgMUTFYLgdo_Nr19-0nCC9UD-aa6ZjfNIZI"
 NUMBER_OF_STUDENTS = 77
 # Lab number of labs that are not graded.
 UNGRADED_LABS = [12]
@@ -172,7 +172,8 @@ def main():
         creds = allow_user_to_authenticate_google_account()
         gradescope_client = initialize_gs_client()
         make_score_sheet_for_one_assignment(creds, gradescope_client = gradescope_client)
-    populate_instructor_dashboard()
+    else:
+        populate_instructor_dashboard()
 
 
 def populate_instructor_dashboard():
